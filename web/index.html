@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>员工信息</title>
+    <link rel="stylesheet" href="js/layui/css/layui.css" media="all">
+    <style>
+        html,body{
+            width: 100%;
+            height: 100%;
+        }
+        #table{
+            border-collapse: collapse;
+            width: 90%;
+            text-align: center;
+            box-shadow: 6px 10px 15px lightgray;
+        }
+        #table th,table td{
+            padding: 7px;
+        }
+        #table a:hover{
+            cursor: pointer;
+            color: red;
+        }
+        #table2 input[type='button']{
+            padding:5px 10px;
+
+        }
+    </style>
+
+</head>
+<body>
+<marquee>
+    <h1 style="color:red;">欢迎您的到来</h1>
+</marquee>
+<div id="demo2-1"></div>
+
+<table id="table" border="1">
+    <thead id="thead">
+    <tr>
+        <th>选择</th> <th>员工编号</th><th>员工姓名</th><th>员工年龄</th><th>员工性别</th><th>员工邮箱</th><th>个人介绍</th><th>操作</th>
+    </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+</table>
+<br/>
+
+<form id="form1" action="" method="post">
+    <fieldset id="fieldset" style="display: block;"><legend>操作</legend>
+        <table id="table2">
+            <tr>
+                <td><label for="eid">员工编号</label></td><td><input style="background: lightgray" id="eid" name="eid" type="text" readonly></td>
+            </tr>
+            <tr>
+                <td><label for="ename">员工姓名</label></td><td><input id="ename" name="ename" type="text" ></td>
+            </tr>
+            <tr>
+                <td><label for="eage">员工年龄</label></td><td><input id="eage" name="eage" type="number" ></td>
+            </tr>
+            <tr>
+                <td><label for="esex">员工性别</label></td><td><select name="esex" id="esex">
+                <option value="1">男</option><option value="0">女</option>
+            </select></td>
+            </tr>
+            <tr>
+                <td><label for="eemail">员工邮箱</label></td><td><input id="eemail" name="eemail" type="email" ></td>
+            </tr>
+            <tr>
+                <td><label>自我介绍</label>
+            </tr>
+            <tr>
+                <div id="editor"></div>
+            </tr>
+            <tr>
+                <td>操作</td>
+                <td><input id="btnadd" type="button" value="添加"><input id="btnupdate" type="button" value="修改">
+                    <input id="btndelall" type="button" value="批量删除"></td>
+            </tr>
+        </table>
+    </fieldset>
+</form>
+
+</body>
+<script src="js/jquery-1.11.3.js" type="text/javascript"></script>
+<script src="js/layui/layui.js" type="text/javascript"></script>
+<script src="js/wangEditor.min.js"></script>
+<script>
+    var E = window.wangEditor;
+    var editor = new E('#editor');
+    // 或者 var editor = new E( document.getElementById('editor') )
+    editor.create();
+</script>
+<script>
+    $(function () {
+        //封装概念。
+        //面向对象的概念
+        //一个对象-->app对象
+        var app={
+            count:0,
+            //分页，初始化数据
+            bindata:function () {
+                $.get("doServlet?action=getSum",{},function (sum) {
+                    app.count=sum;
+                    console.log(app.count);
+                    //分页
+                    layui.use(['laypage', 'layer'], function() {
+                        var laypage = layui.laypage
+                            , layer = layui.layer;
+
+                        //总页数大于页码总数
+                        laypage.render({
+                            elem: 'demo2-1'
+                            ,limit:4
+                            , count: app.count //数据总数
+
+                            //当前页
+                            ,curr: location.hash.replace('#!fenye=', '') //获取起始页
+                            ,hash: 'fenye' //自定义hash值
+
+                            , jump: function (obj) {
+
+                                //请求数据
+                                $.ajax({
+                                    url:"doServlet?action=getAllEmployeeByPage",
+                                    data:{pageno:obj.curr,size:obj.limit},
+                                    success:function (data) {
+                                        var jsdata=JSON.parse(data);
+
+                                        //加载到表格
+                                        $("#tbody tr").remove();
+                                        $.each(jsdata,function (index,obj) {
+                                            var tr=$("<tr/>");
+
+                                            var rad=$("<input type='checkbox' class='check'> ").data("eid",obj.eid);
+                                            $("<td/>").append(rad).appendTo(tr);
+                                            $("<td/>").html(obj.eid).appendTo(tr);
+                                            $("<td/>").html(obj.ename).appendTo(tr);
+                                            $("<td/>").html(obj.eage).appendTo(tr);
+                                            $("<td/>").html(obj.esex==1?"男":"女").appendTo(tr);
+                                            $("<td/>").html(obj.eemail).appendTo(tr);
+                                            $("<td/>").html(obj.edesc).appendTo(tr);
+                                            //修改
+                                            var aEdit=$("<a class='aEdit'>修改</a>").data("obj",obj);
+                                            var aDel=$("<a class='aDel'>删除</a>").data("eid",obj.eid);
+
+                                            $("<td/>").append(aEdit).append("  |  ").append(aDel).appendTo(tr);
+
+                                            $("#tbody").append(tr);
+                                        })
+                                    }
+                                })
+                            }
+                        });
+                    })
+                })
+            },
+
+            //删除
+            delete:function(){
+                //this-->.aDel
+                console.log($(this).data("eid"));
+                var eid=$(this).data("eid");
+
+                $.ajax({
+                    url:"doServlet?action=delete",
+                    data:{eid:eid},
+                    beforeSend:function () {
+                        if(!confirm("是否确定删除?")){
+                            //不删除
+                            return false;
+                        }
+                    },
+                    success:function (num) {
+                        console.log(num);
+                        //刷新数据
+                        app.bindata();
+                    }
+                })
+
+            },
+
+            //批量删除
+            deleteAll:function(){
+                var arr=new Array();
+              $(".check").each(function (index,obj) {
+                 if($(this).prop("checked")){
+                     arr.push($(this).data("eid"));
+                 }
+              });
+
+                for (var i=0;i<arr.length;i++){
+                    console.log(arr[i])
+                }
+                $.ajax({
+                    url:"doServlet?action=deleteAll",
+                    data:{arr:arr.toString()},
+                    beforeSend:function(){
+                      if(!confirm("是否确定批量删除?!!")) {
+                          return false;
+                      }
+                    },
+                    success:function (num) {
+                        console.log("批量删除"+num);
+                        //刷新数据
+                        app.bindata();
+                    }
+                })
+            },
+
+            //新增数据
+            insert:function(){
+                //gno,gname,gprice,gdate,gstate
+
+                $.ajax({
+                    url:"doServlet?action=insert",
+                    data:{eid:$("#eid").val(),ename:$("#ename").val(),
+                        eage:$("#eage").val(),esex:$("#esex").val(),eemail:$("#eemail").val(),edesc:editor.txt.html()},
+                    beforeSend:function(){
+                        if($("#ename").val()==""||$("#esex").val()==""||$("#eage").val()==""||$("#eemail").val()==""){
+                            alert("信息未填写完整!");
+                            return false;
+                        }
+                    },
+                    success:function (num) {
+                        console.log("添加成功"+num);
+                        //刷新数据
+                        app.bindata();
+                    }
+                })
+            },
+
+            //获得数据
+            getDate:function(){
+                //原理：先赋值就，然后在修改
+                //赋值
+                var obj=$(this).data("obj");
+                $("#eid").val(obj.eid);
+                $("#ename").val(obj.ename);
+                $("#eage").val(obj.eage);
+                $("#esex").val(obj.esex);
+                $("#eemail").val(obj.eemail);
+                editor.txt.html(obj.edesc);
+
+            },
+
+            //修改数据
+            update:function(){
+                //gno,gname,gprice,gdate,gstate
+                $.ajax({
+                    url:"doServlet?action=update",
+                    data:{eid:$("#eid").val(),ename:$("#ename").val(),
+                        eage:$("#eage").val(),esex:$("#esex").val(),eemail:$("#eemail").val(),edesc:editor.txt.html()},
+                    success:function (num) {
+                        console.log("修改成功"+num);
+                        //刷新数据
+                        app.bindata();
+                    }
+                })
+            },
+
+            //初始化
+            init(){
+                app.bindata();
+                //监听点击事件
+                //委托对象
+                $("#tbody").on("click",".aDel",app.delete);
+                //委托添加
+                $("#btnadd").click(app.insert);
+                //监听修改点击
+                $("#tbody").on("click",".aEdit",app.getDate);
+                //委托修改
+                $("#btnupdate").click(app.update);
+                $("#btndelall").click(app.deleteAll);
+            }
+        };
+
+        //只和用户暴露一个接口，他只知道我有一个Init 方法，而不知道我里面还有什么方法。，
+        //提高了数据的安全性，和代码可读
+        app.init();
+
+    })
+
+</script>
+</html>
